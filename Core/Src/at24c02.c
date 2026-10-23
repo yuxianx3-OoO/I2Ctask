@@ -2,7 +2,7 @@
 #include "i2c_bus.h"
 #include "stm32f1xx_hal_def.h"
 
-#define AT24C02_ADDR  0x50
+#define AT24C02_ADDR  0x51
 #define AT24C02_SIZE     256
 #define AT24C02_PAGE_SIZE     8
 
