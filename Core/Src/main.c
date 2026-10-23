@@ -28,6 +28,8 @@
 /* USER CODE BEGIN Includes */
 #include <stdio.h>
 #include <string.h>
+#include "at24c02.h"
+#include "i2c_bus.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -67,29 +69,6 @@ int __io_putchar(int ch)
 
     return ch;
 }
-HAL_StatusTypeDef AT24C02_WriteByte(uint8_t addr , uint8_t *data,uint16_t len)
-{
-  if(data == NULL || len == 0 || len>256-addr)
-    return HAL_ERROR;
-  HAL_StatusTypeDef status;
-  while(len>0)
-  {
-     // 计算当前页还剩多少字节
-    uint16_t page_left = 8-(addr%8);
-     // 本次最多写多少字节
-    uint16_t count=len>page_left?page_left:len;
-    status= HAL_I2C_Mem_Write(&hi2c1,0x50<<1,addr,I2C_MEMADD_SIZE_8BIT,data,count,100);
-    if(status != HAL_OK)
-      return status;
-    status = HAL_I2C_IsDeviceReady(&hi2c1,0x50<<1,20,100);
-    if(status != HAL_OK)
-      return status;
-    addr+=count;
-    data+=count;
-    len-=count;
-  }
-  return HAL_OK;
-}
 /* USER CODE END 0 */
 
 /**
@@ -125,39 +104,50 @@ int main(void)
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
   //测试跨页写入及连续读取
-  uint8_t write_buf[5] = {0x11, 0x22, 0x33, 0x44, 0x55};
-  uint8_t read_buf[5] = {0};
-
+  static uint8_t write_buf[256];
+  static uint8_t read_buf[256];
+  //这里使用 static，让数组使用静态存储空间，避免两个较大的数组占用函数调用栈
   HAL_StatusTypeDef status;
+  uint16_t errors = 0;
 
-  // 从 0x06 开始写入 5 字节
-  status = AT24C02_WriteByte(0x06, write_buf, 5);
+  for (int i = 0; i < 256; i++)
+  {
+    write_buf[i] = i;
+    read_buf[i] = 0;
+  }
+
+  
+  status = AT24C02_WriteBytes(0x00, write_buf, 256);
 
   if (status==HAL_OK)
   {
-    status = HAL_I2C_Mem_Read(&hi2c1, 0x50<<1, 0x06, I2C_MEMADD_SIZE_8BIT, read_buf, 5, 100);
+    status = AT24C02_ReadBytes(0x00, read_buf, 256);//现在 main.c 不再直接调用 HAL 的 EEPROM 读写函数
     if (status==HAL_OK)
     {
-      uint8_t match=1;
-      for(int i=0; i<5 ;i++)
+      printf("Read 256 bytes OK\r\n");
+      for(int i=0; i<256 ;i++)
       {
-        printf("0x%02X: Write=%02X Read=%02X\r\n",0x06+i,write_buf[i],read_buf[i]);
         
         if (write_buf[i] != read_buf[i])
-          match=0;
+        {
+          errors++;
+          printf("Error at 0x%02X\r\n", i);
+        }
 
       }
       
-      if (match)
-          printf("Page Test PASS\r\n");
+      if (errors == 0)
+          printf("Full EEPROM Test PASS!\r\n");
       else
-          printf("Page Test FAIL\r\n");
+          printf("Full EEPROM Test FAIL: %u errors\r\n",  (unsigned int)errors);
+                 
     }
   }
   else
   {
     printf("Write Error\r\n");
   }
+  
   // uint8_t write_data = 0x55;单字节上传测试
 
   // uint8_t read_data = 0;
