@@ -103,28 +103,49 @@ int main(void)
   MX_I2C1_Init();
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
-  if (I2C_Bus_Init() != HAL_OK)
-{
-    printf("Soft I2C Init Failed\r\n");
-}
-else
-{
-    uint8_t data = 0;
+  I2C_Bus_Init();
+volatile uint32_t idle_count = 0;
 
-    HAL_StatusTypeDef status =
-        AT24C02_ReadBytes(0x10, &data, 1);
+uint8_t read_buf[256];
 
-    if (status == HAL_OK)
+uint32_t start = HAL_GetTick();
+
+HAL_StatusTypeDef status =
+    AT24C02_ReadBytes(0x00, read_buf, 256);
+
+if (status == HAL_OK)
+{
+    while (HAL_GetTick() - start < 100)
     {
-        printf("Soft I2C Read OK\r\n");
-        printf("Data = 0x%02X\r\n", data);
+        idle_count++;
     }
-    else
-    {
-        printf("Soft I2C Read Failed: %d\r\n",
-               (int)status);
-    }
+
+    printf("Idle Count = %lu\r\n",
+           (unsigned long)idle_count);
 }
+    /*软件通信验证*/
+//   if (I2C_Bus_Init() != HAL_OK)
+// {
+//     printf("Soft I2C Init Failed\r\n");
+// }
+// else
+// {
+//     uint8_t data = 0;
+
+//     HAL_StatusTypeDef status =
+//         AT24C02_ReadBytes(0x10, &data, 1);
+
+//     if (status == HAL_OK)
+//     {
+//         printf("Soft I2C Read OK\r\n");
+//         printf("Data = 0x%02X\r\n", data);
+//     }
+//     else
+//     {
+//         printf("Soft I2C Read Failed: %d\r\n",
+//                (int)status);
+//     }
+// }
   //硬件初步容错处理策略
   // uint8_t data = 0;
 
