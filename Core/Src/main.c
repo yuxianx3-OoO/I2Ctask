@@ -103,39 +103,208 @@ int main(void)
   MX_I2C1_Init();
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
-  //模拟一次 I2C 通信异常
+  //初步容错处理策略
   uint8_t data = 0;
+
   HAL_StatusTypeDef status;
 
   status = AT24C02_ReadBytes(0x10, &data, 1);
+
   if (status == HAL_OK)
-{
-    printf("Read OK: 0x%02X\r\n", data);
-}
-else
-{
-    uint32_t error = HAL_I2C_GetError(&hi2c1);
+  {
+      printf("Read OK: 0x%02X\r\n", data);
+  }
+  else
+  {
+      // 保存本次错误信息
+      uint32_t error = HAL_I2C_GetError(&hi2c1);
 
-    printf("Read Failed!\r\n");
-    printf("HAL Status: %d\r\n", (int)status);
-    printf("I2C Error: 0x%08lX\r\n",
-           (unsigned long)error);
+      // 读取物理总线电平
+      uint8_t scl =
+          HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_6) == GPIO_PIN_SET;
 
-    if (error & HAL_I2C_ERROR_AF)
-    {
-        printf("No ACK received!\r\n");
-    }
+      uint8_t sda =
+          HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_7) == GPIO_PIN_SET;
 
-    if (error & HAL_I2C_ERROR_BERR)
-    {
-        printf("Bus Error!\r\n");
-    }
+      // 读取外设 BUSY 标志
+      uint8_t busy =
+          __HAL_I2C_GET_FLAG(&hi2c1, I2C_FLAG_BUSY) == SET;
 
-    if (error & HAL_I2C_ERROR_ARLO)
-    {
-        printf("Arbitration Lost!\r\n");
-    }
-}
+      printf("Status=%d Error=0x%08lX\r\n",
+            (int)status, (unsigned long)error);
+
+      printf("SCL=%u SDA=%u BUSY=%u\r\n",
+            scl, sda, busy);
+
+      if ((error & HAL_I2C_ERROR_AF) && scl && sda)
+      {
+          printf("NACK: Check device address\r\n");
+      }
+      else if (scl == 0)
+      {
+          printf("SCL held LOW: Recovery aborted\r\n");
+      }
+      else
+      {
+          HAL_StatusTypeDef result;
+
+          if (sda == 0)
+          {
+              printf("SDA held LOW: Bus recovery\r\n");
+              result = I2C_Bus_Recover();
+          }
+          else
+          {
+              printf("Lines HIGH: Reinit I2C\r\n");
+              result = I2C_Bus_Reinit();
+          }
+
+          if (result == HAL_OK)
+          {
+              status = AT24C02_ReadBytes(0x10, &data, 1);
+
+              if (status == HAL_OK)
+                  printf("Recovery PASS: 0x%02X\r\n", data);
+              else
+                  printf("Recovery read failed\r\n");
+          }
+          else
+          {
+              printf("Recovery procedure failed\r\n");
+          }
+      }
+  }
+  //SDA 断线测试
+  // uint8_t data = 0;
+
+  // HAL_StatusTypeDef status =
+  //     AT24C02_ReadBytes(0x10, &data, 1);
+
+  // // 立即记录本次通信的错误信息
+  // uint32_t error = HAL_I2C_GetError(&hi2c1);
+
+  // printf("Status = %d\r\n", (int)status);
+  // printf("Error = 0x%08lX\r\n", (unsigned long)error);
+
+  // if (status == HAL_OK)
+  // {
+  //     printf("Read OK: 0x%02X\r\n", data);
+  // }
+  // else
+  // {
+  //     printf("Read Failed\r\n");
+
+  //     if (error & HAL_I2C_ERROR_AF)
+  //         printf("NACK detected\r\n");
+
+  //     if (status == HAL_TIMEOUT ||
+  //         (error & HAL_I2C_ERROR_TIMEOUT))
+  //         printf("Timeout detected\r\n");
+  // }
+  // // 第一步：主动调用总线恢复函数
+  // status = I2C_Bus_Recover();
+  // if (status == HAL_OK)
+  // {
+  //     printf("I2C Recover OK\r\n");
+  // }
+  // else
+  // {
+  //     printf("I2C Recover Failed\r\n");
+  // }
+
+  // // 第二步：再次从AT24C02读取数据
+  // status = AT24C02_ReadBytes(0x10, &data, 1);
+
+  // // 第三步：检查读取是否成功
+  // if (status == HAL_OK)
+  // {
+  //     printf("Read OK: 0x%02X\r\n", data);
+  // }
+  // else
+  // {
+  //     printf("Read Failed\r\n");
+  // }    
+  //I2C 总线挂死与自动恢复
+  // uint8_t data = 0;
+
+  // // 1. 故意读取错误设备地址
+  // HAL_StatusTypeDef status;
+
+  // status = AT24C02_ReadBytes(0x10, &data, 1);
+
+  // // 立即保存错误信息
+  // uint32_t error = HAL_I2C_GetError(&hi2c1);
+
+  // printf("Status = %d\r\n", (int)status);
+  // printf("Error = 0x%08lX\r\n", (unsigned long)error);
+
+  // // 2. 判断故障类型
+  // if (error & HAL_I2C_ERROR_AF)
+  // {
+  //     printf("NACK detected\r\n");
+  // }
+
+  // if (error & HAL_I2C_ERROR_BERR)
+  // {
+  //     printf("Bus error detected\r\n");
+  // }
+
+  // if (error & HAL_I2C_ERROR_ARLO)
+  // {
+  //     printf("Arbitration lost\r\n");
+  // }
+
+  // if (status == HAL_TIMEOUT ||
+  //     (error & HAL_I2C_ERROR_TIMEOUT))
+  // {
+  //     printf("Timeout detected\r\n");
+  // }
+
+  // // 3. 读取真实设备
+  // status = AT24C02_ReadBytes(0x10, &data, 1);
+
+  // if (status == HAL_OK)
+  // {
+  //     printf("Communication restored\r\n");
+  //     printf("Data = 0x%02X\r\n", data);
+  // }
+  // else
+  // {
+  //     printf("Communication still failed\r\n");
+  // }
+   //模拟一次 I2C 通信异常
+//   uint8_t data = 0;
+//   HAL_StatusTypeDef status;
+
+//   status = AT24C02_ReadBytes(0x10, &data, 1);
+//   if (status == HAL_OK)
+// {
+//     printf("Read OK: 0x%02X\r\n", data);
+// }
+// else
+// {
+//     uint32_t error = HAL_I2C_GetError(&hi2c1);
+
+//     printf("Read Failed!\r\n");
+//     printf("HAL Status: %d\r\n", (int)status);
+//     printf("I2C Error: 0x%08lX\r\n",
+//            (unsigned long)error);
+
+//     if (error & HAL_I2C_ERROR_AF)/*判断error 里是否包含 AF（应答失败）这个错误位*/
+//     {
+//         printf("No ACK received!\r\n");
+//     }
+
+//     if (error & HAL_I2C_ERROR_BERR)
+//     {
+//         printf("Bus Error!\r\n");
+//     }
+
+//     if (error & HAL_I2C_ERROR_ARLO)
+//     {
+//         printf("Arbitration Lost!\r\n");
+//     }
+// }
   //测试跨页写入及连续读取
   // static uint8_t write_buf[256];
   // static uint8_t read_buf[256];

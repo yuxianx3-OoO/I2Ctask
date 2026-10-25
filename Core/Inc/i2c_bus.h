@@ -16,4 +16,8 @@ HAL_StatusTypeDef I2C_Bus_Read(uint8_t dev_addr,    /* 从机 7 位设备地址(
 
 HAL_StatusTypeDef I2C_Bus_WaitReady(uint8_t dev_addr);
 
+
+HAL_StatusTypeDef I2C_Bus_Recover(void);//I2C 总线恢复函数
+
+HAL_StatusTypeDef I2C_Bus_Reinit(void);
 #endif
