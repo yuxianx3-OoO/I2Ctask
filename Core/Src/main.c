@@ -103,77 +103,99 @@ int main(void)
   MX_I2C1_Init();
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
-  //初步容错处理策略
-  uint8_t data = 0;
+  if (I2C_Bus_Init() != HAL_OK)
+{
+    printf("Soft I2C Init Failed\r\n");
+}
+else
+{
+    uint8_t data = 0;
 
-  HAL_StatusTypeDef status;
+    HAL_StatusTypeDef status =
+        AT24C02_ReadBytes(0x10, &data, 1);
 
-  status = AT24C02_ReadBytes(0x10, &data, 1);
+    if (status == HAL_OK)
+    {
+        printf("Soft I2C Read OK\r\n");
+        printf("Data = 0x%02X\r\n", data);
+    }
+    else
+    {
+        printf("Soft I2C Read Failed: %d\r\n",
+               (int)status);
+    }
+}
+  //硬件初步容错处理策略
+  // uint8_t data = 0;
 
-  if (status == HAL_OK)
-  {
-      printf("Read OK: 0x%02X\r\n", data);
-  }
-  else
-  {
-      // 保存本次错误信息
-      uint32_t error = HAL_I2C_GetError(&hi2c1);
+  // HAL_StatusTypeDef status;
 
-      // 读取物理总线电平
-      uint8_t scl =
-          HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_6) == GPIO_PIN_SET;
+  // status = AT24C02_ReadBytes(0x10, &data, 1);
 
-      uint8_t sda =
-          HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_7) == GPIO_PIN_SET;
+  // if (status == HAL_OK)
+  // {
+  //     printf("Read OK: 0x%02X\r\n", data);
+  // }
+  // else
+  // {
+  //     // 保存本次错误信息
+  //     uint32_t error = HAL_I2C_GetError(&hi2c1);
 
-      // 读取外设 BUSY 标志
-      uint8_t busy =
-          __HAL_I2C_GET_FLAG(&hi2c1, I2C_FLAG_BUSY) == SET;
+  //     // 读取物理总线电平
+  //     uint8_t scl =
+  //         HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_6) == GPIO_PIN_SET;
 
-      printf("Status=%d Error=0x%08lX\r\n",
-            (int)status, (unsigned long)error);
+  //     uint8_t sda =
+  //         HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_7) == GPIO_PIN_SET;
 
-      printf("SCL=%u SDA=%u BUSY=%u\r\n",
-            scl, sda, busy);
+  //     // 读取外设 BUSY 标志
+  //     uint8_t busy =
+  //         __HAL_I2C_GET_FLAG(&hi2c1, I2C_FLAG_BUSY) == SET;
 
-      if ((error & HAL_I2C_ERROR_AF) && scl && sda)
-      {
-          printf("NACK: Check device address\r\n");
-      }
-      else if (scl == 0)
-      {
-          printf("SCL held LOW: Recovery aborted\r\n");
-      }
-      else
-      {
-          HAL_StatusTypeDef result;
+  //     printf("Status=%d Error=0x%08lX\r\n",
+  //           (int)status, (unsigned long)error);
 
-          if (sda == 0)
-          {
-              printf("SDA held LOW: Bus recovery\r\n");
-              result = I2C_Bus_Recover();
-          }
-          else
-          {
-              printf("Lines HIGH: Reinit I2C\r\n");
-              result = I2C_Bus_Reinit();
-          }
+  //     printf("SCL=%u SDA=%u BUSY=%u\r\n",
+  //           scl, sda, busy);
 
-          if (result == HAL_OK)
-          {
-              status = AT24C02_ReadBytes(0x10, &data, 1);
+  //     if ((error & HAL_I2C_ERROR_AF) && scl && sda)
+  //     {
+  //         printf("NACK: Check device address\r\n");
+  //     }
+  //     else if (scl == 0)
+  //     {
+  //         printf("SCL held LOW: Recovery aborted\r\n");
+  //     }
+  //     else
+  //     {
+  //         HAL_StatusTypeDef result;
 
-              if (status == HAL_OK)
-                  printf("Recovery PASS: 0x%02X\r\n", data);
-              else
-                  printf("Recovery read failed\r\n");
-          }
-          else
-          {
-              printf("Recovery procedure failed\r\n");
-          }
-      }
-  }
+  //         if (sda == 0)
+  //         {
+  //             printf("SDA held LOW: Bus recovery\r\n");
+  //             result = I2C_Bus_Recover();
+  //         }
+  //         else
+  //         {
+  //             printf("Lines HIGH: Reinit I2C\r\n");
+  //             result = I2C_Bus_Reinit();
+  //         }
+
+  //         if (result == HAL_OK)
+  //         {
+  //             status = AT24C02_ReadBytes(0x10, &data, 1);
+
+  //             if (status == HAL_OK)
+  //                 printf("Recovery PASS: 0x%02X\r\n", data);
+  //             else
+  //                 printf("Recovery read failed\r\n");
+  //         }
+  //         else
+  //         {
+  //             printf("Recovery procedure failed\r\n");
+  //         }
+  //     }
+  // }
   //SDA 断线测试
   // uint8_t data = 0;
 

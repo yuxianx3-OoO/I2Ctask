@@ -3,6 +3,9 @@
 #define I2C_BUS_H
 
 #include "main.h"
+#define I2C_BUS_USE_SOFT 1
+
+HAL_StatusTypeDef I2C_Bus_Init(void);
 
 HAL_StatusTypeDef I2C_Bus_Write(uint8_t dev_addr,   /* 从机 7 位设备地址(左移 1 位后的写地址) */
                                 uint8_t mem_addr,   /* 从机内部寄存器/存储地址 */
